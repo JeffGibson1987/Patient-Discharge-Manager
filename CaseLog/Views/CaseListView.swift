@@ -111,9 +111,15 @@ struct CaseRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
             HStack(spacing: 8) {
-                Text("OR \(caseItem.surgeryDate.formatted(date: .abbreviated, time: .omitted))")
+                if let surgeryDate = caseItem.surgeryDate {
+                    Text("OR \(surgeryDate.formatted(date: .abbreviated, time: .omitted))")
+                }
                 if let dischargeDate = caseItem.dischargeDate {
                     Text("DC \(dischargeDate.formatted(date: .abbreviated, time: .omitted))")
+                }
+                if caseItem.isDischarged && !caseItem.isComplete {
+                    Text("Incomplete")
+                        .foregroundStyle(.orange)
                 }
                 if !caseItem.events.isEmpty {
                     Label("\(caseItem.events.count)", systemImage: "exclamationmark.triangle")

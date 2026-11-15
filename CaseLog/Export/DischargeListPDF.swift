@@ -49,12 +49,12 @@ enum DischargeListPDF {
             }
             return [
                 caseItem.displayName,
-                dateFormatter.string(from: caseItem.dateOfBirth),
-                "\(caseItem.ageAtSurgery)",
-                caseItem.gender.rawValue,
-                dateFormatter.string(from: caseItem.surgeryDate),
+                caseItem.dateOfBirth.map { dateFormatter.string(from: $0) } ?? "",
+                caseItem.ageAtSurgery.map { "\($0)" } ?? "",
+                caseItem.gender?.label ?? "",
+                caseItem.surgeryDate.map { dateFormatter.string(from: $0) } ?? "",
                 caseItem.dischargeDate.map { dateFormatter.string(from: $0) } ?? "",
-                caseItem.dischargeDestination?.rawValue ?? "",
+                caseItem.dischargeDestination?.label ?? "",
                 caseItem.referringProvider,
                 caseItem.procedures.joined(separator: "\n"),
                 events.isEmpty ? "None" : events.joined(separator: "\n"),

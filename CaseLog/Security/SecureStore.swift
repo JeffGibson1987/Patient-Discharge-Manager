@@ -6,7 +6,7 @@ import SwiftData
 /// iOS Data Protection "Complete" (unreadable while the phone is locked),
 /// excluded from iCloud and Finder backups, and never synced through CloudKit.
 enum SecureStore {
-    static let schema = Schema([SurgicalCase.self, PostOpEvent.self, AuditEvent.self])
+    static let schema = Schema(versionedSchema: CaseLogSchemaV1.self)
 
     static func makeContainer() throws -> ModelContainer {
         let directory = try storeDirectory()
@@ -17,7 +17,11 @@ enum SecureStore {
             allowsSave: true,
             cloudKitDatabase: .none
         )
-        return try ModelContainer(for: schema, configurations: [configuration])
+        return try ModelContainer(
+            for: schema,
+            migrationPlan: CaseLogMigrationPlan.self,
+            configurations: [configuration]
+        )
     }
 
     private static func storeDirectory() throws -> URL {
