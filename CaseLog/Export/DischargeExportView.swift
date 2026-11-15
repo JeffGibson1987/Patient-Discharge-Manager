@@ -17,6 +17,10 @@ struct DischargeExportView: View {
         DischargeWeek.cases(discharged, in: week)
     }
 
+    private var incompleteInWeek: [SurgicalCase] {
+        DischargeWeek.incompleteCases(discharged, in: week)
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -48,10 +52,27 @@ struct DischargeExportView: View {
                     ForEach(casesInWeek) { caseItem in
                         VStack(alignment: .leading, spacing: 2) {
                             Text(caseItem.displayName)
-                            Text("DC \(caseItem.dischargeDate?.formatted(date: .abbreviated, time: .omitted) ?? "") · \(caseItem.dischargeDestination?.rawValue ?? "")")
+                            Text("DC \(caseItem.dischargeDate?.formatted(date: .abbreviated, time: .omitted) ?? "") · \(caseItem.dischargeDestination?.label ?? "")")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+                    }
+                }
+
+                if !incompleteInWeek.isEmpty {
+                    Section {
+                        ForEach(incompleteInWeek) { caseItem in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(caseItem.displayName)
+                                Text("Missing: \(caseItem.missingForDischargeList.joined(separator: ", "))")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    } header: {
+                        Text("\(incompleteInWeek.count) not on the list")
+                    } footer: {
+                        Text("These patients were discharged this week, but their records are incomplete. Finish them to add them to the list.")
                     }
                 }
 

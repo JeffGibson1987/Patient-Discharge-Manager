@@ -24,8 +24,18 @@ enum DischargeWeek {
         return interval(startingAt: start)
     }
 
-    /// Discharged, not deleted, with a discharge date inside the week; sorted by discharge date then name.
+    /// Complete records only: not deleted, every required field filled in, post-op events
+    /// answered, and a discharge date inside the week. Sorted by discharge date then name.
     static func cases(_ all: [SurgicalCase], in week: DateInterval) -> [SurgicalCase] {
+        dischargedInWeek(all, week).filter(\.isComplete)
+    }
+
+    /// Discharged inside the week but missing something, so kept off the list.
+    static func incompleteCases(_ all: [SurgicalCase], in week: DateInterval) -> [SurgicalCase] {
+        dischargedInWeek(all, week).filter { !$0.isComplete }
+    }
+
+    private static func dischargedInWeek(_ all: [SurgicalCase], _ week: DateInterval) -> [SurgicalCase] {
         all
             .filter { caseItem in
                 guard caseItem.deletedAt == nil, let date = caseItem.dischargeDate else { return false }

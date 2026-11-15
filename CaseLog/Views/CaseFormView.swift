@@ -20,6 +20,10 @@ struct CaseFormView: View {
                 eventsSection
             }
             dischargeSection
+            missingSection
+        }
+        .onChange(of: caseItem.dischargeDate) { _, newValue in
+            if newValue == nil { caseItem.dischargeDestination = nil }
         }
         .navigationTitle(isNew ? "New case" : caseItem.displayName)
         .navigationBarTitleDisplayMode(.inline)
@@ -39,6 +43,7 @@ struct CaseFormView: View {
                 let event = PostOpEvent(category: category, subcategory: subcategory, dateNoted: date, note: note)
                 context.insert(event)
                 event.surgicalCase = caseItem
+                caseItem.noPostOpEvents = false
                 saveEdits()
             }
         }
@@ -67,24 +72,38 @@ struct CaseFormView: View {
 
     // MARK: Sections
 
+    /// What still has to be filled in: to save a new case, or to put this one on the discharge list.
+    @ViewBuilder
+    private var missingSection: some View {
+        let missing = isNew ? caseItem.missingRequiredFields : caseItem.missingForDischargeList
+        if !missing.isEmpty {
+            Section {
+                Text(missing.joined(separator: ", "))
+                    .foregroundStyle(.orange)
+            } header: {
+                Text(isNew ? "Needed to save" : "Needed for the discharge list")
+            }
+        }
+    }
+
     private var patientSection: some View {
         Section("Patient") {
             TextField("First name", text: $caseItem.firstName)
                 .autocorrectionDisabled()
             TextField("Last name", text: $caseItem.lastName)
                 .autocorrectionDisabled()
-            DatePicker("Date of birth", selection: $caseItem.dateOfBirth, in: ...Date.now, displayedComponents: .date)
+            DateEntryField(title: "Date of birth", date: $caseItem.dateOfBirth)
             Picker("Gender", selection: $caseItem.gender) {
-                ForEach(Gender.allCases) { Text($0.rawValue).tag($0) }
+                ForEach(Gender.allCases) { Text($0.label).tag(Optional($0)) }
             }
             .pickerStyle(.segmented)
-            LabeledContent("Age at surgery", value: "\(caseItem.ageAtSurgery)")
+            LabeledContent("Age at surgery", value: caseItem.ageAtSurgery.map { "\($0)" } ?? "–")
         }
     }
 
     private var surgerySection: some View {
         Section("Surgery") {
-            DatePicker("Surgery date", selection: $caseItem.surgeryDate, displayedComponents: .date)
+            OptionalDateRow(title: "Surgery date", date: $caseItem.surgeryDate, setButtonTitle: "Today", latest: caseItem.dischargeDate)
             Picker("Surgeon", selection: $caseItem.surgeon) {
                 ForEach(surgeonChoices, id: \.self) { Text($0).tag($0) }
             }
@@ -94,8 +113,12 @@ struct CaseFormView: View {
                 ProcedurePickerView(selection: $caseItem.procedures)
             } label: {
                 LabeledContent("Procedures") {
-                    Text(caseItem.procedures.isEmpty ? "None" : caseItem.procedures.joined(separator: ", "))
-                        .multilineTextAlignment(.trailing)
+                    if caseItem.procedures.isEmpty {
+                        Text("Required").foregroundStyle(.red)
+                    } else {
+                        Text(caseItem.procedures.joined(separator: ", "))
+                            .multilineTextAlignment(.trailing)
+                    }
                 }
             }
         }
@@ -121,6 +144,9 @@ struct CaseFormView: View {
                 }
                 saveEdits()
             }
+            if caseItem.events.isEmpty {
+                Toggle("None", isOn: $caseItem.noPostOpEvents)
+            }
             Button {
                 addingEvent = true
             } label: {
@@ -128,16 +154,28 @@ struct CaseFormView: View {
             }
         } header: {
             Text("Post-op events")
+        } footer: {
+            if caseItem.events.isEmpty && !caseItem.noPostOpEvents {
+                Text("Turn on None or add an event. The case can't go on the discharge list until this is answered.")
+            }
         }
     }
 
     private var dischargeSection: some View {
         Section {
-            Toggle("Discharged", isOn: isDischarged)
+            OptionalDateRow(
+                title: "Discharge date",
+                date: $caseItem.dischargeDate,
+                emptyText: "In hospital",
+                emptyIsError: false,
+                setButtonTitle: "Discharge",
+                earliest: caseItem.surgeryDate,
+                canClear: true
+            )
             if caseItem.dischargeDate != nil {
-                DatePicker("Discharge date", selection: dischargeDate, in: caseItem.surgeryDate..., displayedComponents: .date)
-                Picker("Destination", selection: dischargeDestination) {
-                    ForEach(DischargeDestination.allCases) { Text($0.rawValue).tag($0) }
+                Picker("Destination", selection: $caseItem.dischargeDestination) {
+                    Text("Select").tag(DischargeDestination?.none)
+                    ForEach(DischargeDestination.allCases) { Text($0.label).tag(Optional($0)) }
                 }
                 TextField("Discharge notes", text: $caseItem.dischargeNotes, axis: .vertical)
                     .lineLimit(2...6)
@@ -151,39 +189,6 @@ struct CaseFormView: View {
         }
     }
 
-    // MARK: Bindings for optional discharge fields
-
-    private var isDischarged: Binding<Bool> {
-        Binding(
-            get: { caseItem.dischargeDate != nil },
-            set: { discharged in
-                if discharged {
-                    caseItem.dischargeDate = max(Date.now, caseItem.surgeryDate)
-                    if caseItem.dischargeDestination == nil {
-                        caseItem.dischargeDestination = .home
-                    }
-                } else {
-                    caseItem.dischargeDate = nil
-                    caseItem.dischargeDestination = nil
-                }
-            }
-        )
-    }
-
-    private var dischargeDate: Binding<Date> {
-        Binding(
-            get: { caseItem.dischargeDate ?? .now },
-            set: { caseItem.dischargeDate = $0 }
-        )
-    }
-
-    private var dischargeDestination: Binding<DischargeDestination> {
-        Binding(
-            get: { caseItem.dischargeDestination ?? .home },
-            set: { caseItem.dischargeDestination = $0 }
-        )
-    }
-
     private var surgeonChoices: [String] {
         var choices = ReferenceData.surgeons
         if !caseItem.surgeon.isEmpty, !choices.contains(caseItem.surgeon) {
@@ -195,8 +200,7 @@ struct CaseFormView: View {
     // MARK: Saving
 
     private var isValid: Bool {
-        !caseItem.firstName.trimmingCharacters(in: .whitespaces).isEmpty
-            && !caseItem.lastName.trimmingCharacters(in: .whitespaces).isEmpty
+        caseItem.missingRequiredFields.isEmpty
     }
 
     private func saveNew() {

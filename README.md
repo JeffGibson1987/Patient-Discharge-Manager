@@ -32,14 +32,28 @@ The generated `CaseLog.xcodeproj` is not committed.
 
 ## What Phase 1 does
 
-- **Cases:** first and last name, DOB, gender, surgery date (age is calculated),
-  surgeon, referring provider, procedures.
+- **Cases:** first and last name, DOB (typed as MM/DD/YYYY), gender, surgery date
+  (age is calculated), surgeon, referring provider, procedures. Name, DOB, gender,
+  surgery date and at least one procedure are required before a case can be saved;
+  none of them has a default.
 - **Post-op events:** the STS-style categories and subcategories from the
-  Tristar discharge spreadsheet, each with a date and a note.
-- **Discharge:** date, destination (Home, SNF, Rehab, Other) and notes.
+  Tristar discharge spreadsheet, each with a date and a note. Each case must have
+  either at least one event or **None** turned on.
+- **Discharge:** date, destination (Home, SNF, Rehab, LTAC, Hospice, Another
+  institution, Deceased) and notes.
 - **Weekly discharge list:** pick a Monday-to-Sunday week, check the list, tap
   **Share PDF**, and choose Outlook. The PDF has the same columns as the spreadsheet's
-  Discharge List sheet.
+  Discharge List sheet. Only complete records are included: every required field,
+  post-op events answered, and a discharge date and destination. Discharged patients
+  with incomplete records are listed separately on that screen, with what's missing.
+
+## Changing the database later
+
+The database layout is versioned (`CaseLog/Models/Schema.swift`). Any change to a stored
+field needs a new schema version and a migration step, as described in that file, so
+cases already on the phone are carried forward. Pick-list values (gender, discharge
+destination) are stored as fixed codes: add new options freely, but never rename or
+remove a code.
 
 ## HIPAA safeguards in this build
 
